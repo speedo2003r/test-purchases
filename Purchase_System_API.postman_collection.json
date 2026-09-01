@@ -152,11 +152,13 @@
                             "listen": "prerequest",
                             "script": {
                                 "exec": [
-                                    "const secret = pm.collectionVariables.get(\"webhook_secret\");",
-                                    "const body = pm.request.body.raw;",
-                                    "const signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                                    "const secret = pm.collectionVariables.get(\"webhook_secret\") || \"local-dev-webhook-secret-change-in-production\";",
+                                    "const resolvedBody = pm.variables.replaceIn(pm.request.body.raw);",
+                                    "pm.request.body.raw = resolvedBody;",
+                                    "const signature = CryptoJS.HmacSHA256(resolvedBody, secret).toString(CryptoJS.enc.Hex);",
                                     "pm.request.headers.upsert({key: 'X-Payment-Signature', value: signature});",
-                                    "console.log(\"Generated HMAC signature:\", signature);"
+                                    "console.log(\"Resolved Body:\", resolvedBody);",
+                                    "console.log(\"Generated HMAC Signature:\", signature);"
                                 ],
                                 "type": "text/javascript"
                             }
@@ -201,10 +203,13 @@
                             "listen": "prerequest",
                             "script": {
                                 "exec": [
-                                    "const secret = pm.collectionVariables.get(\"webhook_secret\");",
-                                    "const body = pm.request.body.raw;",
-                                    "const signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
-                                    "pm.request.headers.upsert({key: 'X-Payment-Signature', value: signature});"
+                                    "const secret = pm.collectionVariables.get(\"webhook_secret\") || \"local-dev-webhook-secret-change-in-production\";",
+                                    "const resolvedBody = pm.variables.replaceIn(pm.request.body.raw);",
+                                    "pm.request.body.raw = resolvedBody;",
+                                    "const signature = CryptoJS.HmacSHA256(resolvedBody, secret).toString(CryptoJS.enc.Hex);",
+                                    "pm.request.headers.upsert({key: 'X-Payment-Signature', value: signature});",
+                                    "console.log(\"Resolved Body:\", resolvedBody);",
+                                    "console.log(\"Generated HMAC Signature:\", signature);"
                                 ],
                                 "type": "text/javascript"
                             }
@@ -399,11 +404,11 @@
         },
         {
             "key": "user_token",
-            "value": "2|btbUC9DSHpI0AMZ8j0zaCmR7t7oQaOFosjMBF4Yo4921b7f4"
+            "value": "4|9ADBGhzsNS8HKpO9NXPwHM6OkgJeIxqxck1tnrbB6e1a5d75"
         },
         {
             "key": "admin_token",
-            "value": "1|CJZvdcWr40cimiJN2FtvuLvPVUdmj70WQPqkbGse90633a79"
+            "value": "3|xArrarglQn8hHxsvctc0dZDxZ3ORhlkmF1hAGzn476b26963"
         },
         {
             "key": "service_id",
