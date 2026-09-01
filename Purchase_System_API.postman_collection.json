@@ -1,0 +1,425 @@
+{
+    "info": {
+        "_postman_id": "a576b9e2-38ef-41a4-9457-3f338575001a",
+        "name": "Purchase Transaction & Reservation System API",
+        "description": "Complete collection to test the purchase reservation lifecycle, payment attempts, webhook processing with HMAC signature, and admin management endpoints.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Customer Flow",
+            "item": [
+                {
+                    "name": "1.1 Create Purchase (Reserve Spot)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData.id) {",
+                                    "    pm.collectionVariables.set(\"purchase_id\", jsonData.id);",
+                                    "    console.log(\"Saved purchase_id:\", jsonData.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{user_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"request_key\": \"{{$guid}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/services/{{service_id}}/purchases",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "services",
+                                "{{service_id}}",
+                                "purchases"
+                            ]
+                        },
+                        "description": "Creates a new pending purchase and locks a spot for 15 minutes. Automatically saves `purchase_id`."
+                    }
+                },
+                {
+                    "name": "1.2 Start Payment Attempt",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "var jsonData = pm.response.json();",
+                                    "if (jsonData.provider_reference) {",
+                                    "    pm.collectionVariables.set(\"provider_reference\", jsonData.provider_reference);",
+                                    "    console.log(\"Saved provider_reference:\", jsonData.provider_reference);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{user_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/purchases/{{purchase_id}}/payment-attempts",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "purchases",
+                                "{{purchase_id}}",
+                                "payment-attempts"
+                            ]
+                        },
+                        "description": "Initiates a payment attempt for the pending purchase. Automatically saves `provider_reference`."
+                    }
+                },
+                {
+                    "name": "1.3 Get Customer Purchase Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{user_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/purchases/{{purchase_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "purchases",
+                                "{{purchase_id}}"
+                            ]
+                        },
+                        "description": "Retrieves the current purchase status (e.g. pending, confirmed) for the customer."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "2. Payment Provider Webhook",
+            "item": [
+                {
+                    "name": "2.1 Deliver Payment Success Webhook (Auto-Signed HMAC)",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "const secret = pm.collectionVariables.get(\"webhook_secret\");",
+                                    "const body = pm.request.body.raw;",
+                                    "const signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                                    "pm.request.headers.upsert({key: 'X-Payment-Signature', value: signature});",
+                                    "console.log(\"Generated HMAC signature:\", signature);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"provider_event_id\": \"evt_{{$timestamp}}\",\n    \"provider_reference\": \"{{provider_reference}}\",\n    \"event_type\": \"success\",\n    \"occurred_at\": \"2026-09-01T20:00:00Z\",\n    \"raw_payload\": {\n        \"status\": \"paid\",\n        \"amount\": 299.00,\n        \"currency\": \"USD\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/webhooks/payments",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "webhooks",
+                                "payments"
+                            ]
+                        },
+                        "description": "Delivers a SUCCESS payment webhook. Pre-request script computes HMAC-SHA256 automatically."
+                    }
+                },
+                {
+                    "name": "2.2 Deliver Payment Failed Webhook (Auto-Signed HMAC)",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "const secret = pm.collectionVariables.get(\"webhook_secret\");",
+                                    "const body = pm.request.body.raw;",
+                                    "const signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                                    "pm.request.headers.upsert({key: 'X-Payment-Signature', value: signature});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"provider_event_id\": \"evt_failed_{{$timestamp}}\",\n    \"provider_reference\": \"{{provider_reference}}\",\n    \"event_type\": \"failed\",\n    \"occurred_at\": \"2026-09-01T20:00:00Z\",\n    \"raw_payload\": {\n        \"reason\": \"insufficient_funds\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/webhooks/payments",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "webhooks",
+                                "payments"
+                            ]
+                        },
+                        "description": "Delivers a FAILED payment webhook."
+                    }
+                },
+                {
+                    "name": "2.3 Webhook Auth Rejection (Missing Signature -> 401)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"provider_event_id\": \"evt_unauth_{{$timestamp}}\",\n    \"provider_reference\": \"test\",\n    \"event_type\": \"success\",\n    \"occurred_at\": \"2026-09-01T20:00:00Z\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/webhooks/payments",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "webhooks",
+                                "payments"
+                            ]
+                        },
+                        "description": "Expected: 401 Unauthorized."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "3. Admin API (JSON)",
+            "item": [
+                {
+                    "name": "3.1 List All Purchases (Admin)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/purchases",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "purchases"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status",
+                                    "value": "confirmed",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "service_id",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "user_id",
+                                    "value": "2",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Admin endpoint to list paginated purchases."
+                    }
+                },
+                {
+                    "name": "3.2 Get Purchase Details with Events (Admin)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/purchases/{{purchase_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "purchases",
+                                "{{purchase_id}}"
+                            ]
+                        },
+                        "description": "Admin endpoint to inspect purchase details, attempts, and webhook events."
+                    }
+                },
+                {
+                    "name": "3.3 Non-Admin Rejection (403 Test)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{user_token}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/admin/purchases",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "admin",
+                                "purchases"
+                            ]
+                        },
+                        "description": "Expected: 403 Forbidden for non-admin tokens."
+                    }
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000"
+        },
+        {
+            "key": "user_token",
+            "value": "2|btbUC9DSHpI0AMZ8j0zaCmR7t7oQaOFosjMBF4Yo4921b7f4"
+        },
+        {
+            "key": "admin_token",
+            "value": "1|CJZvdcWr40cimiJN2FtvuLvPVUdmj70WQPqkbGse90633a79"
+        },
+        {
+            "key": "service_id",
+            "value": "1"
+        },
+        {
+            "key": "purchase_id",
+            "value": "1"
+        },
+        {
+            "key": "provider_reference",
+            "value": "sample_reference"
+        },
+        {
+            "key": "webhook_secret",
+            "value": "local-dev-webhook-secret-change-in-production"
+        }
+    ]
+}
